@@ -1,0 +1,12 @@
+{
+  "bot_token": "8989370054:AAE_8mkCD9P2Wc75qSEjBmHUW74VyZ_NGoQ",
+  "admin_ids": [7675369659],
+  "channel_username": "channelniyato",
+  "locked": false,
+  "global_limit": null,
+  "vip_limit": null,
+  "default_threads": 50,
+  "max_concurrent": 5,
+  "cooldown_sessions": null,
+  "cooldown_minutes": 30
+}
