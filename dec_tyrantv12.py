@@ -1143,133 +1143,225 @@ def save_codm_account(account, password, codm_info, country='N/A', is_clean=Fals
 
 
 def save_clean_or_notclean(account, password, details, codm_info, result_folder='Results'):
-    """Save account details to clean.txt or notclean.txt and organized CODM folders"""
+    """Save only CODM accounts to clean.txt or notclean.txt"""
     try:
+        # Skip accounts without CODM
+        if not codm_info:
+            return
+
+        if str(codm_info.get('codm_nickname', '')).upper() in ['', 'N/A', 'NONE']:
+            return
+
         os.makedirs(result_folder, exist_ok=True)
-        
-        codm_nickname = codm_info.get('codm_nickname', 'N/A') if codm_info else 'N/A'
-        codm_uid = codm_info.get('uid', 'N/A') if codm_info else 'N/A'
-        codm_level = codm_info.get('codm_level', 'N/A') if codm_info else 'N/A'
+
+        codm_nickname = codm_info.get('codm_nickname') or details.get('nickname', '')
+        codm_uid = codm_info.get('uid') or details.get('uid', '')
+        codm_level = codm_info.get('codm_level') or '0'
 
         username = details.get('username', account)
-        email = details.get('email', 'N/A')
-        email_verified_flag = details.get('email_verified') if isinstance(details.get('email_verified'), bool) else False
+
+        email = details.get('email', '')
+        email_verified_flag = bool(details.get('email_verified'))
         email_ver = "Verified" if email_verified_flag else "Not Verified"
-        mobile = details.get('personal', {}).get('mobile_no', 'N/A')
-        mobile_bound = "Yes" if mobile and str(mobile).strip() else "No"
 
-        fb_account = details.get('security', {}).get('facebook_account') or {}
-        fb_linked_flag = details.get('security', {}).get('facebook_connected') or (True if fb_account else False)
-        fb_linked = "Linked" if fb_linked_flag else "Not Linked"
-        fb_uid = fb_account.get('fb_uid') if isinstance(fb_account, dict) else "N/A"
-        fb = f"Linked ({fb_uid})" if fb_linked == 'Linked' else "Not Linked"
-        fbl = f"https://facebook.com/{fb_uid}" if fb_linked == 'Linked' else "N/A"
+        mobile = details.get('personal', {}).get('mobile_no', '')
+        shell = details.get('profile', {}).get('shell_balance', '0')
 
-        safe_avatar = details.get('profile', {}).get('avatar', 'N/A')
-        shell = details.get('profile', {}).get('shell_balance', 'N/A')
-        ipk = details.get('ip_for_msg', 'N/A')
-        ipc = details.get('country', 'N/A')
-        acc_country = details.get('personal', {}).get('country', 'N/A')
+        acc_country = details.get('personal', {}).get('country', '')
+        region = codm_info.get('region') or acc_country
 
-        authenticator_enabled = "Yes" if details.get('security', {}).get('authenticator_app') else "No"
-        two_step_enabled = "Yes" if details.get('security', {}).get('two_step_verify') else "No"
-        
+        garena_nickname = details.get('nickname', '')
+
+        fb_connected = details.get('security', {}).get('facebook_connected', False)
+
+        fb_account = details.get('security', {}).get('facebook_account', {})
+
+        if isinstance(fb_account, dict):
+            fb_username = fb_account.get('fb_username', 'N/A')
+            fb_uid = fb_account.get('fb_uid', 'N/A')
+
+            if fb_uid != 'N/A':
+                fb_account = f"https://facebook.com/{fb_uid}"
+            else:
+                fb_account = fb_username
+
+        if not fb_account or str(fb_account).strip() == "":
+            fb_account = "N/A"
+
+        fb_status = "CONNECTED" if fb_connected else "NOT CONNECTED"
+
+        bindings = ", ".join(details.get('binds', []))
+        if not bindings:
+            bindings = "None"
+
         is_clean = details.get('is_clean', False)
-        clean_status = "CLEAN" if is_clean else "NOT CLEAN"
-        
-        codm_info_block = f"  [+] CODM Nickname : {codm_nickname}\n  [+] CODM UID      : {codm_uid}\n  [+] CODM Level    : {codm_level}"
-        
+
+        file_path = os.path.join(
+            result_folder,
+            'clean.txt' if is_clean else 'notclean.txt'
+        )
+
+        # Generate save number
+        save_number = 1
+
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as sf:
+                save_number = sum(
+                    1 for line in sf
+                    if line.strip().startswith(tuple(str(i) for i in range(10)))
+                ) + 1
+
         content_to_save = f"""
-[LOGIN SUCCESSFUL]
-=======================================
-         [ACCOUNT INFO]
-  [+] Username       : {username}:{password}
-  [+] Last Login     : {details.get('last_login', 'Unknown')}
-  [+] Location       : {details.get('last_login_where', 'N/A')}
-  [+] IP Address     : {ipk}
-  [+] Country (Login): {ipc}
-  [+] Country (User) : {acc_country}
-
-         [ACCOUNT DETAILS]
-  [+] Garena Shells  : {shell}
-  [+] Avatar URL     : {safe_avatar}
-  [+] Mobile No      : {mobile}
-  [+] Email          : {email} ({email_ver})
-  [+] FB Username    : {fb}
-  [+] FB Profile     : {fbl}
-
-         [GAME INFO]
-{codm_info_block}
-
-         [SECURITY BINDINGS]
-  [+] Mobile Bound   : {mobile_bound}
-  [+] Email Verified : {email_verified_flag}
-  [+] Facebook Linked: {fb_linked}
-  [+] Authenticator  : {authenticator_enabled}
-  [+] 2FA Enabled    : {two_step_enabled}
-  [+] Account Status : {clean_status}
-  [] CONFIG BY: @xeryzs
-=======================================
+{save_number}. {account}:{password} =>
+          Clean: {"Yes" if is_clean else "No"}
+          Status: Valid
+          ---
+          Player Info =>
+              UID: {codm_uid}
+              Nickname: {codm_nickname}
+              Level: {codm_level}
+              Shell Balance: {shell}
+              Region: {region}
+              Email: {email} ({email_ver})
+              Phone: {mobile}
+              Country: {acc_country}
+              Garena UID: {details.get('uid', '')}
+              Username: {username}
+              Nickname (Garena): {garena_nickname}
+          ---
+          Last Login: {details.get('last_login', 'Unknown')}
+          From: Garena Mobile ({details.get('last_login_where', 'N/A')})
+          Facebook Status: {fb_status}
+          Facebook Link: {fb_account}
+          Bindings: {bindings}
+          --
 """
-        # Save to main clean.txt or notclean.txt
-        if is_clean:
-            file_path = os.path.join(result_folder, 'clean.txt')
-        else:
-            file_path = os.path.join(result_folder, 'notclean.txt')
-            
+
         account_exists = False
-        identifier = f"  [+] Username       : {username}:{password}"
-        
+
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as f:
-                if identifier in f.read():
+                if f"{account}:{password}" in f.read():
                     account_exists = True
 
         if not account_exists:
             with open(file_path, "a", encoding="utf-8") as f:
                 f.write(content_to_save.strip() + "\n\n")
 
-        # Save to organized CODM folder structure if has CODM
-        if codm_info and codm_info.get('codm_nickname') and codm_info.get('codm_nickname') != 'N/A':
-            save_codm_account(account, password, codm_info, acc_country, is_clean, result_folder)
+        # Keep original CODM folder saver
+        save_codm_account(
+            account,
+            password,
+            codm_info,
+            acc_country,
+            is_clean,
+            result_folder
+        )
 
     except Exception as e:
         pass
 
 
 def save_account_details_full(account, details, codm_info=None, password=None, result_folder='Results'):
-    """Save full account details to full_details.txt"""
+    """Save only CODM accounts to full_details.txt"""
     try:
+        # Skip accounts without CODM
+        if not codm_info:
+            return
+
+        if str(codm_info.get('codm_nickname', '')).upper() in ['', 'N/A', 'NONE']:
+            return
+
         os.makedirs(result_folder, exist_ok=True)
-        
-        codm_name = codm_info.get('codm_nickname', 'N/A') if codm_info else 'N/A'
-        codm_uid = codm_info.get('uid', 'N/A') if codm_info else 'N/A'
-        codm_region = codm_info.get('region', 'N/A') if codm_info else 'N/A'
-        codm_level = codm_info.get('codm_level', 'N/A') if codm_info else 'N/A'
-        shell_balance = details['profile']['shell_balance']
-        country = details['personal']['country']
+
+        full_file = os.path.join(result_folder, 'full_details.txt')
+
+        codm_name = codm_info.get('codm_nickname') or details.get('nickname', '')
+        codm_uid = codm_info.get('uid') or details.get('uid', '')
+        codm_region = codm_info.get('region') or details.get('personal', {}).get('country', '')
+        codm_level = codm_info.get('codm_level') or '0'
+
+        shell = details.get('profile', {}).get('shell_balance', '0')
+
+        email = details.get('email', '')
+        email_verified = "Verified" if details.get('email_verified') else "Not Verified"
+
+        phone = details.get('personal', {}).get('mobile_no', '')
+        country = details.get('personal', {}).get('country', '')
+
+        garena_nickname = details.get('nickname', '')
+
+        fb_connected = details.get('security', {}).get('facebook_connected', False)
+
+        fb_account = details.get('security', {}).get('facebook_account', {})
+
+        if isinstance(fb_account, dict):
+            fb_username = fb_account.get('fb_username', 'N/A')
+            fb_uid = fb_account.get('fb_uid', 'N/A')
+
+            if fb_uid != 'N/A':
+                fb_account = f"https://facebook.com/{fb_uid}"
+            else:
+                fb_account = fb_username
+
+        if not fb_account or str(fb_account).strip() == "":
+            fb_account = "N/A"
+
+        fb_status = "CONNECTED" if fb_connected else "NOT CONNECTED"
+
+        bindings = ", ".join(details.get('binds', []))
+        if not bindings:
+            bindings = "None"
+
         is_clean = details.get('is_clean', False)
 
-        with open(os.path.join(result_folder, 'full_details.txt'), 'a', encoding='utf-8') as f:
-            f.write("=" * 60 + "\n")
-            f.write(f"Account: {account}\n")
-            f.write(f"Password: {password}\n")  
-            f.write(f"UID: {details['uid']}\n")
-            f.write(f"Username: {details['username']}\n")
-            f.write(f"Nickname: {details['nickname']}\n")
-            f.write(f"Email: {details['email']}\n")
-            f.write(f"Phone: {details['personal']['mobile_no']}\n")
-            f.write(f"Country: {country}\n")
-            f.write(f"Shell Balance: {shell_balance}\n")
-            f.write(f"Account Status: {details['status']['account_status']}\n")
-            f.write(f"Is Clean: {is_clean}\n")
-            if codm_info:
-                f.write(f"CODM Name: {codm_name}\n")
-                f.write(f"CODM UID: {codm_uid}\n")
-                f.write(f"CODM Region: {codm_region}\n")
-                f.write(f"CODM Level: {codm_level}\n")
-            f.write("=" * 60 + "\n\n")
-            
+        # Generate save number
+        save_number = 1
+
+        if os.path.exists(full_file):
+            with open(full_file, "r", encoding="utf-8") as sf:
+                save_number = sum(
+                    1 for line in sf
+                    if line.strip().startswith(tuple(str(i) for i in range(10)))
+                ) + 1
+
+        content = f"""
+{save_number}. {account}:{password} =>
+          Clean: {"Yes" if is_clean else "No"}
+          Status: Valid
+          ---
+          Player Info =>
+              UID: {codm_uid}
+              Nickname: {codm_name}
+              Level: {codm_level}
+              Shell Balance: {shell}
+              Region: {codm_region}
+              Email: {email} ({email_verified})
+              Phone: {phone}
+              Country: {country}
+              Garena UID: {details.get('uid', '')}
+              Username: {account}
+              Nickname (Garena): {garena_nickname}
+          ---
+          Last Login: {details.get('last_login', 'Unknown')}
+          From: Garena Mobile ({details.get('last_login_where', 'N/A')})
+          Facebook Status: {fb_status}
+          Facebook Link: {fb_account}
+          Bindings: {bindings}
+          --
+"""
+
+        account_exists = False
+
+        if os.path.exists(full_file):
+            with open(full_file, "r", encoding="utf-8") as f:
+                if f"{account}:{password}" in f.read():
+                    account_exists = True
+
+        if not account_exists:
+            with open(full_file, "a", encoding="utf-8") as f:
+                f.write(content.strip() + "\n\n")
+
     except Exception as e:
         pass
 
@@ -1335,9 +1427,12 @@ def parse_account_details(data):
     id_card = account_info['personal']['id_card']
     if id_card != 'N/A' and id_card and id_card.strip():
         account_info['binds'].append('ID Card')
-    if user_info.get('email_v', 0) == 1 or len(account_info['binds']) > 0:
+    # Facebook does NOT count as dirty bind
+    dirty_binds = [b for b in account_info['binds'] if b not in ['Facebook']]
+
+    if user_info.get('email_v', 0) == 1 or len(dirty_binds) > 0:
         account_info['is_clean'] = False
-        account_info['bind_status'] = f"Bound ({', '.join(account_info['binds']) or 'Email Verified'})"
+        account_info['bind_status'] = f"Bound ({', '.join(dirty_binds) or 'Email Verified'})"
     else:
         account_info['is_clean'] = True
         account_info['bind_status'] = "Clean"
